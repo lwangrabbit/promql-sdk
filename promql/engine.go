@@ -25,8 +25,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/model"
@@ -178,7 +176,6 @@ func contextErr(err error, env string) error {
 
 // EngineOpts contains configuration options used when creating a new Engine.
 type EngineOpts struct {
-	Logger        log.Logger
 	Reg           prometheus.Registerer
 	MaxConcurrent int
 	MaxSamples    int
@@ -188,7 +185,6 @@ type EngineOpts struct {
 // Engine handles the lifetime of queries from beginning to end.
 // It is connected to a querier.
 type Engine struct {
-	logger             log.Logger
 	metrics            *engineMetrics
 	timeout            time.Duration
 	gate               *gate.Gate
@@ -197,10 +193,6 @@ type Engine struct {
 
 // NewEngine returns a new engine.
 func NewEngine(opts EngineOpts) *Engine {
-	if opts.Logger == nil {
-		opts.Logger = log.NewNopLogger()
-	}
-
 	metrics := &engineMetrics{
 		currentQueries: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -258,7 +250,6 @@ func NewEngine(opts EngineOpts) *Engine {
 	return &Engine{
 		gate:               gate.New(opts.MaxConcurrent),
 		timeout:            opts.Timeout,
-		logger:             opts.Logger,
 		metrics:            metrics,
 		maxSamplesPerQuery: opts.MaxSamples,
 	}
@@ -406,7 +397,6 @@ func (ng *Engine) execEvalStmt(ctx context.Context, query *query, s *EvalStmt) (
 			interval:       1,
 			ctx:            ctx,
 			maxSamples:     ng.maxSamplesPerQuery,
-			logger:         ng.logger,
 		}
 		val, err := evaluator.Eval(s.Expr)
 		if err != nil {
@@ -447,7 +437,6 @@ func (ng *Engine) execEvalStmt(ctx context.Context, query *query, s *EvalStmt) (
 		interval:       durationMilliseconds(s.Interval),
 		ctx:            ctx,
 		maxSamples:     ng.maxSamplesPerQuery,
-		logger:         ng.logger,
 	}
 	val, err := evaluator.Eval(s.Expr)
 	if err != nil {
@@ -523,13 +512,11 @@ func (ng *Engine) populateSeries(ctx context.Context, q storage.Queryable, s *Ev
 
 			set, err = querier.Select(params, n.LabelMatchers...)
 			if err != nil {
-				level.Error(ng.logger).Log("msg", "error selecting series set", "err", err)
 				return err
 			}
 			n.series, err = expandSeriesSet(ctx, set)
 			if err != nil {
 				// TODO(fabxc): use multi-error.
-				level.Error(ng.logger).Log("msg", "error expanding series set", "err", err)
 				return err
 			}
 
@@ -546,12 +533,10 @@ func (ng *Engine) populateSeries(ctx context.Context, q storage.Queryable, s *Ev
 
 			set, err = querier.Select(params, n.LabelMatchers...)
 			if err != nil {
-				level.Error(ng.logger).Log("msg", "error selecting series set", "err", err)
 				return err
 			}
 			n.series, err = expandSeriesSet(ctx, set)
 			if err != nil {
-				level.Error(ng.logger).Log("msg", "error expanding series set", "err", err)
 				return err
 			}
 		}
@@ -603,7 +588,6 @@ type evaluator struct {
 
 	maxSamples     int
 	currentSamples int
-	logger         log.Logger
 }
 
 // errorf causes a panic with the input formatted into an error.
@@ -627,7 +611,6 @@ func (ev *evaluator) recover(errp *error) {
 		buf := make([]byte, 64<<10)
 		buf = buf[:runtime.Stack(buf, false)]
 
-		level.Error(ev.logger).Log("msg", "runtime panic in parser", "err", e, "stacktrace", string(buf))
 		*errp = fmt.Errorf("unexpected error: %s", err)
 	} else {
 		*errp = e.(error)

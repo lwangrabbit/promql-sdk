@@ -9,7 +9,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/common/promlog"
 
 	"github.com/lwangrabbit/promql-sdk/promql"
 	"github.com/lwangrabbit/promql-sdk/storage"
@@ -32,7 +31,6 @@ type ReadConfig struct {
 
 func Init(conf *ReadConfig) error {
 	engineOpts := promql.EngineOpts{
-		Logger:        promlog.New(&promlog.Config{}),
 		Reg:           prometheus.DefaultRegisterer,
 		MaxConcurrent: DefaultQueryMaxConcurrency,
 		MaxSamples:    DefaultQueryMaxSamples,
