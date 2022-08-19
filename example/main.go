@@ -10,11 +10,12 @@ import (
 
 func main() {
 	// init
-	c := promql_sdk.ReadConfig{
+	c := &promql_sdk.ReadConfig{
 		URL:     "http://127.0.0.1:8086/api/v1/prom/read?db=prometheus",
 		Timeout: 1 * time.Minute,
 	}
-	err := promql_sdk.Init(&c)
+	configs := []*promql_sdk.ReadConfig{c}
+	err := promql_sdk.Init(configs)
 	if err != nil {
 		panic(err)
 	}

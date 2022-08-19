@@ -3,6 +3,7 @@ package promql_sdk
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
 	"time"
 
@@ -29,7 +30,7 @@ type ReadConfig struct {
 	Timeout time.Duration
 }
 
-func Init(conf *ReadConfig) error {
+func Init(configs []*ReadConfig) error {
 	engineOpts := promql.EngineOpts{
 		Reg:           prometheus.DefaultRegisterer,
 		MaxConcurrent: DefaultQueryMaxConcurrency,
@@ -39,16 +40,20 @@ func Init(conf *ReadConfig) error {
 	queryEngine = promql.NewEngine(engineOpts)
 
 	var err error
-	u, err := url.Parse(conf.URL)
-	if err != nil {
-		return err
+	var rConfs = make([]*storage.RemoteReadConfig, 0, len(configs))
+	for _, conf := range configs {
+		u, err := url.Parse(conf.URL)
+		if err != nil {
+			return err
+		}
+		rconf := &storage.RemoteReadConfig{
+			URL:           &config_util.URL{URL: u},
+			RemoteTimeout: model.Duration(conf.Timeout),
+			Name:          fmt.Sprintf("promql-read-%v", conf.URL),
+		}
+		rConfs = append(rConfs, rconf)
 	}
-	rconf := &storage.RemoteReadConfig{
-		URL:           &config_util.URL{URL: u},
-		RemoteTimeout: model.Duration(conf.Timeout),
-		Name:          "promql-read",
-	}
-	remoteStorage, err = storage.NewStorage(rconf)
+	remoteStorage, err = storage.NewStorage(rConfs)
 	if err != nil {
 		return err
 	}

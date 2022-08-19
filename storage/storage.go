@@ -9,46 +9,42 @@ import (
 )
 
 type storage struct {
-	queryable Queryable
+	queryables []Queryable
 }
 
-func NewStorage(conf *RemoteReadConfig) (Storage, error) {
-	c, err := NewClient(0, &ClientConfig{
-		URL:              conf.URL,
-		Timeout:          conf.RemoteTimeout,
-		HTTPClientConfig: conf.HTTPClientConfig,
-	})
-	if err != nil {
-		return nil, err
-	}
-	q := QueryableClient(c)
-	if len(conf.RequiredMatchers) > 0 {
-		q = RequiredMatchersFilter(q, labelsToEqualityMatchers(conf.RequiredMatchers))
+func NewStorage(configs []*RemoteReadConfig) (Storage, error) {
+	queryables := make([]Queryable, 0, len(configs))
+	for _, conf := range configs {
+		c, err := NewClient(0, &ClientConfig{
+			URL:              conf.URL,
+			Timeout:          conf.RemoteTimeout,
+			HTTPClientConfig: conf.HTTPClientConfig,
+		})
+		if err != nil {
+			return nil, err
+		}
+		q := QueryableClient(c)
+		if len(conf.RequiredMatchers) > 0 {
+			q = RequiredMatchersFilter(q, labelsToEqualityMatchers(conf.RequiredMatchers))
+		}
+		queryables = append(queryables, q)
 	}
 	return &storage{
-		queryable: q,
+		queryables: queryables,
 	}, nil
 }
 
-func (s *storage) ApplyConfig(conf *RemoteReadConfig) error {
-	c, err := NewClient(0, &ClientConfig{
-		URL:              conf.URL,
-		Timeout:          conf.RemoteTimeout,
-		HTTPClientConfig: conf.HTTPClientConfig,
-	})
-	if err != nil {
-		return err
-	}
-	q := QueryableClient(c)
-	if len(conf.RequiredMatchers) > 0 {
-		q = RequiredMatchersFilter(q, labelsToEqualityMatchers(conf.RequiredMatchers))
-	}
-	s.queryable = q
-	return nil
-}
-
 func (s *storage) Querier(ctx context.Context, mint, maxt int64) (Querier, error) {
-	return s.queryable.Querier(ctx, mint, maxt)
+	querables := s.queryables
+	queriers := make([]Querier, 0, len(querables))
+	for _, queryable := range querables {
+		q, err := queryable.Querier(ctx, mint, maxt)
+		if err != nil {
+			return nil, err
+		}
+		queriers = append(queriers, q)
+	}
+	return NewMergeQuerier(queriers), nil
 }
 
 func (s *storage) Close() error {
