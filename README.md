@@ -8,11 +8,12 @@ promql-sdk make tsdb can use promql, implemented by prometheus remote-read.
 ### 1. init
 
 ```
-c := promql_sdk.ReadConfig{
+c := &promql_sdk.ReadConfig{
     URL:     "http://127.0.0.1:8086/api/v1/prom/read?db=prometheus",    //influxdb
     Timeout: 1 * time.Minute,
 }
-err := promql_sdk.Init(&c)
+configs := []*promql_sdk.ReadConfig{c}
+err := promql_sdk.Init(configs)
 ```
 
 ### 2. query instant
