@@ -19,7 +19,9 @@ import (
 var (
 	queryEngine   *promql.Engine
 	remoteStorage storage.Storage
+)
 
+const (
 	DefaultQueryMaxConcurrency = 20
 	DefaultQueryMaxSamples     = 50000000
 	DefaultQueryTimeout        = 2 * time.Minute
@@ -30,7 +32,7 @@ type ReadConfig struct {
 	Timeout time.Duration
 }
 
-func Init(configs []*ReadConfig) error {
+func Init(configs []*ReadConfig, ops ...func()) error {
 	engineOpts := promql.EngineOpts{
 		Reg:           prometheus.DefaultRegisterer,
 		MaxConcurrent: DefaultQueryMaxConcurrency,
@@ -38,6 +40,11 @@ func Init(configs []*ReadConfig) error {
 		Timeout:       DefaultQueryTimeout,
 	}
 	queryEngine = promql.NewEngine(engineOpts)
+
+	// Custom configs
+	for _, op := range ops {
+		op()
+	}
 
 	var err error
 	var rConfs = make([]*storage.RemoteReadConfig, 0, len(configs))
@@ -58,6 +65,16 @@ func Init(configs []*ReadConfig) error {
 		return err
 	}
 	return nil
+}
+
+func LookBackDelta(t time.Duration) func() {
+	return func() {
+		if t >= 1 * time.Minute && t <= promql.DefaultLookbackDelta {
+			promql.LookbackDelta = t
+		} else {
+			panic("invalid value of lookbackdelta")
+		}
+	}
 }
 
 func Query(query string) (*QueryData, error) {

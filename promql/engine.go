@@ -1772,9 +1772,13 @@ func shouldDropMetricName(op ItemType) bool {
 	}
 }
 
+const (
+	DefaultLookbackDelta = 5 * time.Minute
+)
+
 // LookbackDelta determines the time since the last sample after which a time
 // series is considered stale.
-var LookbackDelta = 5 * time.Minute
+var LookbackDelta = DefaultLookbackDelta
 
 // documentedType returns the internal type to the equivalent
 // user facing terminology as defined in the documentation.

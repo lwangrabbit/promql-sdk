@@ -15,7 +15,7 @@ func main() {
 		Timeout: 1 * time.Minute,
 	}
 	configs := []*promql_sdk.ReadConfig{c}
-	err := promql_sdk.Init(configs)
+	err := promql_sdk.Init(configs, promql_sdk.LookBackDelta(3*time.Minute))
 	if err != nil {
 		panic(err)
 	}
