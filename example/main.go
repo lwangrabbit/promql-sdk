@@ -10,11 +10,20 @@ import (
 
 func main() {
 	// init
-	c := &promql_sdk.ReadConfig{
-		URL:     "http://127.0.0.1:8086/api/v1/prom/read?db=prometheus",
-		Timeout: 1 * time.Minute,
+	configs := []*promql_sdk.ReadConfig{
+		&promql_sdk.ReadConfig{
+			URL:     "http://192.168.0.1:8086/api/v1/prom/read?db=prometheus",
+			Timeout: 10 * time.Second,
+		},
+		&promql_sdk.ReadConfig{
+			URL:     "http://192.168.0.2:8086/api/v1/prom/read?db=prometheus",
+			Timeout: 10 * time.Second,
+		},
+		&promql_sdk.ReadConfig{
+			URL:     "http://192.168.0.3:8086/api/v1/prom/read?db=prometheus",
+			Timeout: 10 * time.Second,
+		},
 	}
-	configs := []*promql_sdk.ReadConfig{c}
 	err := promql_sdk.Init(configs, promql_sdk.LookBackDelta(3*time.Minute))
 	if err != nil {
 		panic(err)

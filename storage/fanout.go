@@ -3,6 +3,7 @@ package storage
 import (
 	"container/heap"
 	"strings"
+	"sync"
 
 	"github.com/lwangrabbit/promql-sdk/pkg/labels"
 )
@@ -39,12 +40,34 @@ func NewMergeQuerier(queriers []Querier) Querier {
 // Select returns a set of series that matches the given label matchers.
 func (q *mergeQuerier) Select(params *SelectParams, matchers ...*labels.Matcher) (SeriesSet, error) {
 	seriesSets := make([]SeriesSet, 0, len(q.queriers))
+	var wg sync.WaitGroup
+	seriesSetChan := make(chan SeriesSet, len(q.queriers))
+	var errors []error
 	for _, querier := range q.queriers {
-		set, err := querier.Select(params, matchers...)
-		if err != nil {
-			return nil, err
-		}
-		seriesSets = append(seriesSets, set)
+		wg.Add(1)
+		go func(querier Querier) {
+			defer wg.Done()
+
+			set, err := querier.Select(params, matchers...)
+			if err != nil {
+				errors = append(errors, err)
+			} else {
+				seriesSetChan <- set
+			}
+		}(querier)
+	}
+
+	go func() {
+		wg.Wait()
+		close(seriesSetChan)
+	}()
+
+	for r := range seriesSetChan {
+		seriesSets = append(seriesSets, r)
+	}
+
+	if len(errors) >= len(q.queriers) {
+		return nil, errors[0]
 	}
 	return NewMergeSeriesSet(seriesSets), nil
 }

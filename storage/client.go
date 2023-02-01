@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"time"
 
@@ -38,7 +39,12 @@ type ClientConfig struct {
 
 // NewClient creates a new Client.
 func NewClient(index int, conf *ClientConfig) (*Client, error) {
-	httpClient, err := config_util.NewClientFromConfig(conf.HTTPClientConfig, "remote_storage")
+	httpClient, err := config_util.NewClientFromConfig(conf.HTTPClientConfig, fmt.Sprintf("remote_storage-%d", index),
+		config_util.WithDialContextFunc((&net.Dialer{
+			Timeout:   3 * time.Second,
+			KeepAlive: 10 * time.Second,
+		}).DialContext),
+	)
 	if err != nil {
 		return nil, err
 	}
