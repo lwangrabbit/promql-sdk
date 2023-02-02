@@ -41,8 +41,8 @@ type ClientConfig struct {
 func NewClient(index int, conf *ClientConfig) (*Client, error) {
 	httpClient, err := config_util.NewClientFromConfig(conf.HTTPClientConfig, fmt.Sprintf("remote_storage-%d", index),
 		config_util.WithDialContextFunc((&net.Dialer{
-			Timeout:   3 * time.Second,
-			KeepAlive: 10 * time.Second,
+			Timeout:   500 * time.Millisecond,
+			KeepAlive: 5 * time.Second,
 		}).DialContext),
 	)
 	if err != nil {
