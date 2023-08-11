@@ -69,7 +69,7 @@ func Init(configs []*ReadConfig, ops ...func()) error {
 
 func LookBackDelta(t time.Duration) func() {
 	return func() {
-		if t >= 1 * time.Minute && t <= promql.DefaultLookbackDelta {
+		if t >= 1*time.Minute && t <= promql.DefaultLookbackDelta {
 			promql.LookbackDelta = t
 		} else {
 			panic("invalid value of lookbackdelta")
@@ -78,8 +78,11 @@ func LookBackDelta(t time.Duration) func() {
 }
 
 func Query(query string) (*QueryData, error) {
-	ts := time.Now()
-	qry, err := queryEngine.NewInstantQuery(remoteStorage, query, ts)
+	return QueryInstant(query, time.Now().Unix())
+}
+
+func QueryInstant(query string, ts int64) (*QueryData, error) {
+	qry, err := queryEngine.NewInstantQuery(remoteStorage, query, time.Unix(ts, 0))
 	if err != nil {
 		return nil, err
 	}
