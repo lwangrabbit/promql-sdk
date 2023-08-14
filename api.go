@@ -1,8 +1,6 @@
 package promql_sdk
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"net/url"
 	"time"
@@ -22,9 +20,12 @@ var (
 )
 
 const (
-	DefaultQueryMaxConcurrency = 20
-	DefaultQueryMaxSamples     = 50000000
-	DefaultQueryTimeout        = 2 * time.Minute
+	DefaultEngineQueryMaxConcurrency = 20
+	DefaultEngineQueryMaxSamples     = 50000000
+	DefaultEngineQueryTimeout        = 30 * time.Second
+
+	DefaultAPIInstantQueryTimeout = 10 * time.Second
+	DefaultAPIRangeQueryTimeout   = 30 * time.Second
 )
 
 type ReadConfig struct {
@@ -35,9 +36,9 @@ type ReadConfig struct {
 func Init(configs []*ReadConfig, ops ...func()) error {
 	engineOpts := promql.EngineOpts{
 		Reg:           prometheus.DefaultRegisterer,
-		MaxConcurrent: DefaultQueryMaxConcurrency,
-		MaxSamples:    DefaultQueryMaxSamples,
-		Timeout:       DefaultQueryTimeout,
+		MaxConcurrent: DefaultEngineQueryMaxConcurrency,
+		MaxSamples:    DefaultEngineQueryMaxSamples,
+		Timeout:       DefaultEngineQueryTimeout,
 	}
 	queryEngine = promql.NewEngine(engineOpts)
 
@@ -82,61 +83,13 @@ func Query(query string) (*QueryData, error) {
 }
 
 func QueryInstant(query string, ts int64) (*QueryData, error) {
-	qry, err := queryEngine.NewInstantQuery(remoteStorage, query, time.Unix(ts, 0))
-	if err != nil {
-		return nil, err
-	}
-	defer qry.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	res := qry.Exec(ctx)
-	if res.Err != nil {
-		return nil, res.Err
-	}
-	return &QueryData{
-		ResultType: res.Value.Type(),
-		Result:     res.Value,
-		Stats:      stats.NewQueryStats(qry.Stats()),
-	}, nil
+	qry := NewInstantQuery(query, InstantQueryTime(ts), InstantQueryTimeout(30*time.Second))
+	return qry.Do()
 }
 
 func QueryRange(query string, startTs int64, endTs int64, step int) (*QueryData, error) {
-	if startTs > endTs {
-		return nil, errors.New("startTs/endTs error")
-	}
-	if step <= 0 {
-		step = 60
-	}
-	if (endTs-startTs)/int64(step) > 11000 {
-		err := errors.New("exceeded maximum resolution of 11,000 points per timeseries")
-		return nil, err
-	}
-
-	qry, err := queryEngine.NewRangeQuery(
-		remoteStorage,
-		query,
-		time.Unix(startTs, 0),
-		time.Unix(endTs, 0),
-		time.Duration(step)*time.Second)
-	if err != nil {
-		return nil, err
-	}
-	defer qry.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	res := qry.Exec(ctx)
-	if res.Err != nil {
-		return nil, res.Err
-	}
-	return &QueryData{
-		ResultType: res.Value.Type(),
-		Result:     res.Value,
-		Stats:      stats.NewQueryStats(qry.Stats()),
-	}, nil
+	qry := NewRangeQuery(query, startTs, endTs, step, RangeQueryTimeout(60*time.Second))
+	return qry.Do()
 }
 
 type QueryData struct {
